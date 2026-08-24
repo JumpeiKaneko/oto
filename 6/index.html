@@ -355,16 +355,15 @@ function draw(){
 
   for (const b of active){
     const col = PALETTE[b.colorIdx];
+    noStroke();
+    fill(col[0], col[1], col[2]);
+    let jx = 0, jy = 0;
     if (b.flash > 0.01){
-      stroke(col[0], col[1], col[2]);
-      strokeWeight(Math.max(2, ballRadiusNow*0.16));
-      fill(255,255,255);
-      b.flash -= 0.10;
-    } else {
-      noStroke();
-      fill(col[0], col[1], col[2]);
+      jx = (Math.random()*2-1) * 1.6 * b.flash;
+      jy = (Math.random()*2-1) * 1.6 * b.flash;
+      b.flash -= 0.2;
     }
-    circle(b.x, b.y, ballRadiusNow*2);
+    circle(b.x+jx, b.y+jy, ballRadiusNow*2);
   }
 
   const daysTotal = Math.round((GLOBAL_END.getTime() - GLOBAL_START.getTime()) / (24*60*60*1000));
