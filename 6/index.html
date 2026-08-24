@@ -101,7 +101,7 @@ function seedFromString(str){
 /* イヴ・クラインのモノクロームの発想：器は全部同じ一色 */
 const KLEIN = [0, 40, 168];
 const PALETTE = [KLEIN, KLEIN, KLEIN];
-const ACCENT = [242, 239, 233]; // 衝突の閃きは白
+const ACCENT = [17, 17, 17]; // 衝突の閃きは黒(白背景で視認できるように)
 
 /* ============================================================
    和音：長音階上で3度堆積、ちょうどn音のコードを作る
@@ -156,7 +156,7 @@ class Ball{
   }
 }
 
-let boundW, boundH;
+let boundW, boundH, boundOffX = 0, boundOffY = 0;
 
 function initBalls(seedNum){
   const r = mulberry32(seedNum);
@@ -167,8 +167,8 @@ function initBalls(seedNum){
     [ranks[i], ranks[j]] = [ranks[j], ranks[i]];
   }
   for (let i=0; i<ballCount; i++){
-    const x = r()*boundW;
-    const y = r()*boundH;
+    const x = boundOffX + r()*boundW;
+    const y = boundOffY + r()*boundH;
     const colorIdx = i % PALETTE.length;
     balls.push(new Ball(x,y, chordFreqs[i], colorIdx, ranks[i], r()*1000));
   }
@@ -201,7 +201,7 @@ function playChime(freq, panX, velMag, volumeScale){
   filter.frequency.linearRampToValueAtTime(500, now + 3.2);
 
   const gain = audioCtx.createGain();
-  const peak = Math.min(0.34, 0.09 + velMag*0.6) * volumeScale;
+  const peak = Math.min(0.24, 0.07 + velMag*0.45) * volumeScale;
   gain.gain.setValueAtTime(0.0001, now);
   gain.gain.linearRampToValueAtTime(peak, now + 0.32);
   gain.gain.linearRampToValueAtTime(peak*0.7, now + 1.0);
@@ -232,7 +232,7 @@ function playChime(freq, panX, velMag, volumeScale){
   filter.connect(gain); gain.connect(panner); panner.connect(masterGain);
 
   const strikeGain = audioCtx.createGain();
-  const strikePeak = Math.min(0.22, 0.05 + velMag*0.35) * volumeScale;
+  const strikePeak = Math.min(0.15, 0.035 + velMag*0.25) * volumeScale;
   strikeGain.gain.setValueAtTime(0.0001, now);
   strikeGain.gain.linearRampToValueAtTime(strikePeak, now + 0.005);
   strikeGain.gain.exponentialRampToValueAtTime(0.0001, now + 1.1);
@@ -280,10 +280,12 @@ function updatePhysics(aliveCount, speedScale, volumeScale, ballRadiusNow, nowMs
     b.x += b.vx; b.y += b.vy;
 
     const r0 = ballRadiusNow;
-    if (b.x < r0){ b.x = r0; b.vx = Math.abs(b.vx)*0.6; }
-    if (b.x > boundW-r0){ b.x = boundW-r0; b.vx = -Math.abs(b.vx)*0.6; }
-    if (b.y < r0){ b.y = r0; b.vy = Math.abs(b.vy)*0.6; }
-    if (b.y > boundH-r0){ b.y = boundH-r0; b.vy = -Math.abs(b.vy)*0.6; }
+    const minX = boundOffX+r0, maxX = boundOffX+boundW-r0;
+    const minY = boundOffY+r0, maxY = boundOffY+boundH-r0;
+    if (b.x < minX){ b.x = minX; b.vx = Math.abs(b.vx)*0.6; }
+    if (b.x > maxX){ b.x = maxX; b.vx = -Math.abs(b.vx)*0.6; }
+    if (b.y < minY){ b.y = minY; b.vy = Math.abs(b.vy)*0.6; }
+    if (b.y > maxY){ b.y = maxY; b.vy = -Math.abs(b.vy)*0.6; }
   }
 
   for (let i=0; i<active.length; i++){
@@ -329,13 +331,15 @@ function setup(){
   computeBounds();
 }
 function computeBounds(){
-  boundW = width; boundH = height;
+  const margin = Math.min(width, height) * 0.16;
+  boundOffX = margin; boundOffY = margin;
+  boundW = width - margin*2; boundH = height - margin*2;
 }
 function windowResized(){ resizeCanvas(windowWidth, windowHeight); computeBounds(); }
 
 function draw(){
   noStroke();
-  fill(5,5,6);
+  fill(255,255,255);
   rect(0,0,width,height);
 
   if (!running) return;
@@ -380,7 +384,7 @@ document.getElementById('startOverlay').addEventListener('click', async ()=>{
   if (!audioCtx){
     audioCtx = new (window.AudioContext || window.webkitAudioContext)();
     masterGain = audioCtx.createGain();
-    masterGain.gain.value = 0.9;
+    masterGain.gain.value = 0.6;
     masterFilter = audioCtx.createBiquadFilter();
     masterFilter.type = 'lowpass';
     masterFilter.frequency.value = 9000;
@@ -388,13 +392,21 @@ document.getElementById('startOverlay').addEventListener('click', async ()=>{
     convolver = audioCtx.createConvolver();
     convolver.buffer = createImpulseResponse(audioCtx, 7.5, 2.2);
     wetGain = audioCtx.createGain();
-    wetGain.gain.value = 0.68;
+    wetGain.gain.value = 0.5;
+
+    const limiter = audioCtx.createDynamicsCompressor();
+    limiter.threshold.value = -18;
+    limiter.knee.value = 24;
+    limiter.ratio.value = 14;
+    limiter.attack.value = 0.003;
+    limiter.release.value = 0.25;
 
     masterGain.connect(masterFilter);
     masterGain.connect(convolver);
     convolver.connect(wetGain);
     wetGain.connect(masterFilter);
-    masterFilter.connect(audioCtx.destination);
+    masterFilter.connect(limiter);
+    limiter.connect(audioCtx.destination);
   }
   if (audioCtx.state === 'suspended') await audioCtx.resume();
   startPiece();
