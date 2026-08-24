@@ -355,8 +355,15 @@ function draw(){
 
   for (const b of active){
     const col = PALETTE[b.colorIdx];
-    noStroke();
-    fill(col[0], col[1], col[2]);
+    if (b.flash > 0.01){
+      stroke(col[0], col[1], col[2]);
+      strokeWeight(Math.max(2, ballRadiusNow*0.16));
+      fill(255,255,255);
+      b.flash -= 0.10;
+    } else {
+      noStroke();
+      fill(col[0], col[1], col[2]);
+    }
     circle(b.x, b.y, ballRadiusNow*2);
   }
 
