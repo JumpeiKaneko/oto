@@ -96,6 +96,7 @@ function seedFromString(str){
 
 /* イヴ・クラインのモノクロームの発想：器は全部同じ一色 */
 const KLEIN = [0, 40, 168];
+const FLASH_COLOR = [130, 160, 235]; // クラインブルーを明るくしただけの同系色
 const PALETTE = [KLEIN, KLEIN, KLEIN];
 
 /* ============================================================
@@ -356,14 +357,13 @@ function draw(){
   for (const b of active){
     const col = PALETTE[b.colorIdx];
     noStroke();
-    fill(col[0], col[1], col[2]);
-    let jx = 0, jy = 0;
     if (b.flash > 0.01){
-      jx = (Math.random()*2-1) * 1.6 * b.flash;
-      jy = (Math.random()*2-1) * 1.6 * b.flash;
-      b.flash -= 0.2;
+      fill(FLASH_COLOR[0], FLASH_COLOR[1], FLASH_COLOR[2]);
+      b.flash -= 0.09;
+    } else {
+      fill(col[0], col[1], col[2]);
     }
-    circle(b.x+jx, b.y+jy, ballRadiusNow*2);
+    circle(b.x, b.y, ballRadiusNow*2);
   }
 
   const daysTotal = Math.round((GLOBAL_END.getTime() - GLOBAL_START.getTime()) / (24*60*60*1000));
