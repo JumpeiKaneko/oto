@@ -67,7 +67,7 @@ canvas{ display:block; }
    時間軸：現実の暦時間で1年かけて朽ちる（6用・9用で共通の時間軸）
    ※展示初日に合わせて GLOBAL_START を書き換えること。
 ============================================================ */
-const GLOBAL_START = new Date('2026-08-24T00:00:00+09:00');
+const GLOBAL_START = new Date('2026-09-04T00:00:00+09:00');
 const YEAR_MS = 365 * 24 * 60 * 60 * 1000;
 const GLOBAL_END = new Date(GLOBAL_START.getTime() + YEAR_MS);
 
@@ -156,8 +156,7 @@ class Ball{
   }
 }
 
-let basinCX, basinCY, basinR;
-const BASIN_SCALE = 0.30;
+let boundW, boundH;
 
 function initBalls(seedNum){
   const r = mulberry32(seedNum);
@@ -168,10 +167,8 @@ function initBalls(seedNum){
     [ranks[i], ranks[j]] = [ranks[j], ranks[i]];
   }
   for (let i=0; i<ballCount; i++){
-    const angle = r()*Math.PI*2;
-    const rad = r()*basinR*0.7;
-    const x = basinCX + Math.cos(angle)*rad;
-    const y = basinCY + Math.sin(angle)*rad;
+    const x = r()*boundW;
+    const y = r()*boundH;
     const colorIdx = i % PALETTE.length;
     balls.push(new Ball(x,y, chordFreqs[i], colorIdx, ranks[i], r()*1000));
   }
@@ -282,15 +279,11 @@ function updatePhysics(aliveCount, speedScale, volumeScale, ballRadiusNow, nowMs
 
     b.x += b.vx; b.y += b.vy;
 
-    const dx = b.x-basinCX, dy = b.y-basinCY;
-    const dist = Math.hypot(dx,dy);
-    const limit = basinR - ballRadiusNow;
-    if (dist > limit && dist > 0){
-      const nx = dx/dist, ny = dy/dist;
-      b.x = basinCX + nx*limit; b.y = basinCY + ny*limit;
-      const vn = b.vx*nx + b.vy*ny;
-      b.vx -= 1.6*vn*nx; b.vy -= 1.6*vn*ny;
-    }
+    const r0 = ballRadiusNow;
+    if (b.x < r0){ b.x = r0; b.vx = Math.abs(b.vx)*0.6; }
+    if (b.x > boundW-r0){ b.x = boundW-r0; b.vx = -Math.abs(b.vx)*0.6; }
+    if (b.y < r0){ b.y = r0; b.vy = Math.abs(b.vy)*0.6; }
+    if (b.y > boundH-r0){ b.y = boundH-r0; b.vy = -Math.abs(b.vy)*0.6; }
   }
 
   for (let i=0; i<active.length; i++){
@@ -333,13 +326,12 @@ function setup(){
   const cnv = createCanvas(windowWidth, windowHeight);
   cnv.parent(document.getElementById('sketch-holder'));
   colorMode(RGB, 255);
-  computeBasin();
+  computeBounds();
 }
-function computeBasin(){
-  basinCX = width/2; basinCY = height/2;
-  basinR = Math.min(width, height) * BASIN_SCALE;
+function computeBounds(){
+  boundW = width; boundH = height;
 }
-function windowResized(){ resizeCanvas(windowWidth, windowHeight); computeBasin(); }
+function windowResized(){ resizeCanvas(windowWidth, windowHeight); computeBounds(); }
 
 function draw(){
   noStroke();
@@ -374,41 +366,11 @@ function draw(){
     circle(b.x, b.y, ballRadiusNow*2);
   }
 
+  const daysTotal = Math.round((GLOBAL_END.getTime() - GLOBAL_START.getTime()) / (24*60*60*1000));
+  const daysLeft = Math.max(0, Math.ceil((GLOBAL_END.getTime() - Date.now()) / (24*60*60*1000)));
   const liveEl = document.getElementById('liveCount');
-  liveEl.textContent = String(aliveCount).padStart(2,'0');
+  liveEl.textContent = String(daysLeft).padStart(3,'0');
   liveEl.classList.add('show');
-}
-
-/* ============================================================
-   ピンチで水槽の範囲を調整
-============================================================ */
-let userBasinScale = BASIN_SCALE;
-function touchDist(touches){
-  const dx = touches[0].clientX - touches[1].clientX;
-  const dy = touches[0].clientY - touches[1].clientY;
-  return Math.hypot(dx,dy);
-}
-function setupPinch(){
-  const holder = document.getElementById('sketch-holder');
-  let startDist = null, startScale = null;
-  holder.addEventListener('touchstart', (e)=>{
-    if (e.touches.length === 2){
-      startDist = touchDist(e.touches);
-      startScale = userBasinScale;
-    }
-  }, {passive:true});
-  holder.addEventListener('touchmove', (e)=>{
-    if (e.touches.length === 2 && startDist){
-      e.preventDefault();
-      const d = touchDist(e.touches);
-      const ratio = d / startDist;
-      userBasinScale = Math.max(0.14, Math.min(0.48, startScale*ratio));
-      basinR = Math.min(width, height) * userBasinScale;
-    }
-  }, {passive:false});
-  holder.addEventListener('touchend', (e)=>{
-    if (e.touches.length < 2) startDist = null;
-  });
 }
 
 /* ============================================================
@@ -440,8 +402,7 @@ document.getElementById('startOverlay').addEventListener('click', async ()=>{
 });
 
 function startPiece(){
-  setupPinch();
-  computeBasin();
+  computeBounds();
   const params = new URLSearchParams(location.search);
   const seedText = params.get('seed') || '';
   const seedNum = seedText ? seedFromString(seedText) : Math.floor(Math.random()*1e9);
