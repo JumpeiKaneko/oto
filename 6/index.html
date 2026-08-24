@@ -357,9 +357,7 @@ function draw(){
     const col = PALETTE[b.colorIdx];
     noStroke();
     fill(col[0], col[1], col[2]);
-    const pulse = 1 + b.flash*0.45;
-    if (b.flash > 0.01) b.flash -= 0.10;
-    circle(b.x, b.y, ballRadiusNow*2*pulse);
+    circle(b.x, b.y, ballRadiusNow*2);
   }
 
   const daysTotal = Math.round((GLOBAL_END.getTime() - GLOBAL_START.getTime()) / (24*60*60*1000));
